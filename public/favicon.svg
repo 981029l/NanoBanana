@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- 渐变定义 -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景圆形 -->
+  <circle cx="24" cy="24" r="24" fill="url(#grad1)"/>
+  
+  <!-- 眼睛外轮廓 -->
+  <path d="M12 24C12 24 16 16 24 16C32 16 36 24 36 24C36 24 32 32 24 32C16 32 12 24 12 24Z" 
+        stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- 瞳孔 -->
+  <circle cx="24" cy="24" r="4" fill="white"/>
+  <circle cx="24" cy="24" r="2" fill="url(#grad1)"/>
+  
+  <!-- 高光 -->
+  <circle cx="25.5" cy="22.5" r="1.5" fill="white" opacity="0.8"/>
+</svg>
+
+

@@ -1,0 +1,5 @@
+
+{
+  "name": "Nano Banana Photo Editor",
+  "description": "An intuitive web application that leverages Google's Gemini Flash Image model (Nano Banana) to allow users to upload photos and apply edits using simple text prompts. Experience the power of generative AI for creative image manipulation."
+}
