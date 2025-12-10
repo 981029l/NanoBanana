@@ -8,27 +8,12 @@ import Header from './components/Header';
 import { MagicWandIcon, ResetIcon, EyeIcon } from './components/IconComponents';
 import { compressImage, getImageSize, formatFileSize } from './utils/imageUtils'; // 图片压缩工具
 import { debounce, throttle } from './utils/debounce'; // 防抖和节流工具
+import { dbManager, migrateFromLocalStorage } from './utils/indexedDB'; // IndexedDB 管理器
+import LoadingProgress from './components/LoadingProgress'; // 加载进度组件
+import ErrorAlert from './components/ErrorAlert'; // 错误提示组件
 
-const PROMPT_HISTORY_KEY = 'nano-banana-prompt-history';
-const GENERATION_HISTORY_KEY = 'nano-banana-generation-history';
 const MAX_HISTORY_ITEMS = 10;
-const MAX_GENERATION_HISTORY = 5; // 减少到5条以节省存储空间
-
-// 获取 localStorage 使用情况
-const getStorageInfo = () => {
-  try {
-    let totalSize = 0;
-    for (const key in localStorage) {
-      if (localStorage.hasOwnProperty(key)) {
-        totalSize += localStorage[key].length + key.length;
-      }
-    }
-    const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
-    return { totalSize, sizeInMB };
-  } catch (e) {
-    return { totalSize: 0, sizeInMB: '0' };
-  }
-};
+const MAX_GENERATION_HISTORY = 20; // IndexedDB 容量大，可以存储更多历史记录
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<'single' | 'multi' | 'text'>('single'); // 单图/多图/纯文字模式
@@ -82,6 +67,8 @@ const App: React.FC = () => {
   const [editedImage, setEditedImage] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadingStage, setLoadingStage] = useState<'analyzing' | 'generating' | 'finalizing'>('analyzing'); // 加载阶段
+  const [loadingProgress, setLoadingProgress] = useState<number>(0); // 加载进度
   const [error, setError] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState<'split' | 'slider'>('split'); // 对比模式
   const [sliderPosition, setSliderPosition] = useState<number>(50); // 滑块位置
@@ -100,43 +87,46 @@ const App: React.FC = () => {
     []
   );
 
-  // 从 localStorage 加载提示词历史
+  // 初始化 IndexedDB 并加载数据
   useEffect(() => {
-    try {
-      const savedHistory = localStorage.getItem(PROMPT_HISTORY_KEY);
-      if (savedHistory) {
-        setPromptHistory(JSON.parse(savedHistory));
+    const initDB = async () => {
+      try {
+        await dbManager.init();
+        console.log('✅ IndexedDB 初始化成功');
+        
+        // 尝试从 localStorage 迁移数据
+        const migrationResult = await migrateFromLocalStorage();
+        if (migrationResult.success && migrationResult.migratedCount > 0) {
+          console.log(`🔄 已迁移 ${migrationResult.migratedCount} 条历史记录`);
+        }
+        
+        // 加载提示词历史
+        const prompts = await dbManager.getPromptHistory(MAX_HISTORY_ITEMS);
+        setPromptHistory(prompts);
+        
+        // 加载生成历史
+        const histories = await dbManager.getAllGenerationHistory(MAX_GENERATION_HISTORY);
+        setGenerationHistory(histories);
+        
+        // 显示存储使用情况
+        const storageInfo = await dbManager.getStorageEstimate();
+        console.log(`💾 存储使用: ${storageInfo.usageInMB} MB / ${storageInfo.quotaInMB} MB`);
+      } catch (error) {
+        console.error('❌ IndexedDB 初始化失败:', error);
       }
-    } catch (error) {
-      console.error('Failed to load prompt history:', error);
-    }
+    };
+    
+    initDB();
+    
+    // 组件卸载时关闭数据库连接
+    return () => {
+      dbManager.close();
+    };
   }, []);
 
-  // 从 localStorage 加载生成历史
-  useEffect(() => {
-    try {
-      const savedGenerations = localStorage.getItem(GENERATION_HISTORY_KEY);
-      if (savedGenerations) {
-        const parsed = JSON.parse(savedGenerations);
-        // 只保留最新的 MAX_GENERATION_HISTORY 条记录
-        const trimmed = Array.isArray(parsed) ? parsed.slice(0, MAX_GENERATION_HISTORY) : [];
-        setGenerationHistory(trimmed);
-        
-        // 如果记录被裁剪了，更新 localStorage
-        if (trimmed.length < parsed.length) {
-          localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(trimmed));
-          console.log(`已清理旧历史记录：${parsed.length} → ${trimmed.length} 条`);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load generation history:', error);
-      // 如果加载失败，清空损坏的数据
-      localStorage.removeItem(GENERATION_HISTORY_KEY);
-    }
-  }, []);
 
   // 保存提示词到历史
-  const savePromptToHistory = useCallback((promptText: string) => {
+  const savePromptToHistory = useCallback(async (promptText: string) => {
     if (!promptText.trim()) return;
     
     setPromptHistory((prev) => {
@@ -145,12 +135,10 @@ const App: React.FC = () => {
       // 添加到开头
       const newHistory = [promptText, ...filtered].slice(0, MAX_HISTORY_ITEMS);
       
-      // 保存到 localStorage
-      try {
-        localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(newHistory));
-      } catch (error) {
+      // 保存到 IndexedDB
+      dbManager.savePromptHistory(newHistory).catch(error => {
         console.error('Failed to save prompt history:', error);
-      }
+      });
       
       return newHistory;
     });
@@ -161,11 +149,9 @@ const App: React.FC = () => {
     setPromptHistory((prev) => {
       const updated = prev.filter(p => p !== promptToDelete);
       
-      try {
-        localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(updated));
-      } catch (error) {
+      dbManager.savePromptHistory(updated).catch(error => {
         console.error('Failed to delete prompt history item:', error);
-      }
+      });
       
       return updated;
     });
@@ -174,11 +160,9 @@ const App: React.FC = () => {
   // 清除提示词历史
   const clearPromptHistory = useCallback(() => {
     setPromptHistory([]);
-    try {
-      localStorage.removeItem(PROMPT_HISTORY_KEY);
-    } catch (error) {
+    dbManager.savePromptHistory([]).catch(error => {
       console.error('Failed to clear prompt history:', error);
-    }
+    });
   }, []);
 
   // 保存生成结果到历史（带图片压缩）
@@ -218,44 +202,19 @@ const App: React.FC = () => {
       const compressedSize = getImageSize(compressedEdited);
       console.log(`🗜️ 图片压缩: ${formatFileSize(originalSize)} → ${formatFileSize(compressedSize)} (节省 ${Math.round((1 - compressedSize / originalSize) * 100)}%)`);
 
+      // 保存到 IndexedDB
+      await dbManager.saveGenerationHistory(newHistory);
+      console.log(`✅ 历史记录已保存: ${newHistory.id}`);
+      
+      // 更新状态
       setGenerationHistory((prev) => {
-        let updated = [newHistory, ...prev].slice(0, MAX_GENERATION_HISTORY);
-        
-        // 尝试保存到 localStorage，处理配额超出的情况
-        let saveAttempt = 0;
-        const maxAttempts = 3;
-        
-        while (saveAttempt < maxAttempts) {
-          try {
-            localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(updated));
-            // 保存成功，记录存储使用情况
-            const storageInfo = getStorageInfo();
-            console.log(`✅ 历史记录已保存 (${updated.length} 条) | 存储使用: ${storageInfo.sizeInMB} MB`);
-            break;
-          } catch (error) {
-            if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-              console.warn(`存储空间不足，尝试清理历史记录... (尝试 ${saveAttempt + 1}/${maxAttempts})`);
-              
-              if (updated.length > 1) {
-                // 减少历史记录数量
-                updated = updated.slice(0, Math.max(1, Math.floor(updated.length / 2)));
-                saveAttempt++;
-              } else {
-                // 只有一条记录也无法保存，清空历史
-                console.error('无法保存历史记录：存储空间不足');
-                localStorage.removeItem(GENERATION_HISTORY_KEY);
-                updated = [newHistory];
-                break;
-              }
-            } else {
-              console.error('Failed to save generation history:', error);
-              break;
-            }
-          }
-        }
-        
+        const updated = [newHistory, ...prev].slice(0, MAX_GENERATION_HISTORY);
         return updated;
       });
+      
+      // 显示存储使用情况
+      const storageInfo = await dbManager.getStorageEstimate();
+      console.log(`💾 存储使用: ${storageInfo.usageInMB} MB / ${storageInfo.quotaInMB} MB`);
     } catch (error) {
       console.error('压缩图片失败，使用原图保存:', error);
       // 如果压缩失败，使用原图保存
@@ -270,38 +229,32 @@ const App: React.FC = () => {
         isTextToImage: isText,
       };
       
-      setGenerationHistory((prev) => {
-        const updated = [newHistory, ...prev].slice(0, MAX_GENERATION_HISTORY);
-        try {
-          localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(updated));
-        } catch (e) {
-          console.error('保存历史记录失败:', e);
-        }
-        return updated;
-      });
+      try {
+        await dbManager.saveGenerationHistory(newHistory);
+        setGenerationHistory((prev) => [newHistory, ...prev].slice(0, MAX_GENERATION_HISTORY));
+      } catch (e) {
+        console.error('保存历史记录失败:', e);
+      }
     }
   }, []);
 
   // 删除单个历史记录
-  const deleteHistoryItem = useCallback((id: string) => {
-    setGenerationHistory((prev) => {
-      const updated = prev.filter(item => item.id !== id);
-      
-      try {
-        localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(updated));
-      } catch (error) {
-        console.error('Failed to delete history item:', error);
-      }
-      
-      return updated;
-    });
+  const deleteHistoryItem = useCallback(async (id: string) => {
+    try {
+      await dbManager.deleteGenerationHistory(id);
+      setGenerationHistory((prev) => prev.filter(item => item.id !== id));
+      console.log(`🗑️ 已删除历史记录: ${id}`);
+    } catch (error) {
+      console.error('Failed to delete history item:', error);
+    }
   }, []);
 
   // 清空所有生成历史
-  const clearGenerationHistory = useCallback(() => {
-    setGenerationHistory([]);
+  const clearGenerationHistory = useCallback(async () => {
     try {
-      localStorage.removeItem(GENERATION_HISTORY_KEY);
+      await dbManager.clearGenerationHistory();
+      setGenerationHistory([]);
+      console.log('🧹 已清空所有历史记录');
     } catch (error) {
       console.error('Failed to clear generation history:', error);
     }
@@ -410,6 +363,21 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setEditedImage(null);
+    setLoadingProgress(0);
+    setLoadingStage('analyzing');
+
+    // 模拟进度更新
+    const progressInterval = setInterval(() => {
+      setLoadingProgress(prev => {
+        if (prev < 20) return prev + 2; // 分析阶段慢
+        if (prev < 85) return prev + 1; // 生成阶段
+        return prev; // 等待完成
+      });
+    }, 200);
+
+    // 阶段切换
+    setTimeout(() => setLoadingStage('generating'), 1000);
+    setTimeout(() => setLoadingStage('finalizing'), 4000);
 
     try {
       let result: string;
@@ -447,13 +415,18 @@ const App: React.FC = () => {
         );
       }
       
+      // 完成时设置进度为 100%
+      setLoadingProgress(100);
+      
       setEditedImage(result);
       // 生成成功后保存提示词到历史 (保存原始输入，方便用户修改)
       savePromptToHistory(prompt);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.");
     } finally {
+      clearInterval(progressInterval);
       setIsLoading(false);
+      setLoadingProgress(0);
     }
   };
 
@@ -725,6 +698,15 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col items-center p-2 sm:p-4 relative pb-20 md:pb-4">
+      {/* 加载进度组件 */}
+      {isLoading && (
+        <LoadingProgress 
+          stage={loadingStage}
+          progress={loadingProgress}
+          estimatedTime={loadingProgress < 85 ? Math.ceil((100 - loadingProgress) / 5) : undefined}
+        />
+      )}
+      
       <Header />
       <main className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center flex-grow relative z-10">
         {/* 桌面端顶部模式切换栏 - 隐藏在移动端 */}
@@ -1006,29 +988,11 @@ const App: React.FC = () => {
                   </button>
 
                   {error && (
-                    <div className="error-alert-container fade-in">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                          <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <div className="flex-grow">
-                          <h4 className="font-semibold text-red-800 mb-1">生成失败</h4>
-                          <p className="text-sm text-red-600 mb-2">{error}</p>
-                          <p className="text-xs text-red-500">💡 提示：可以点击"立即生成"按钮重新尝试</p>
-                        </div>
-                        <button
-                          onClick={() => setError(null)}
-                          className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors"
-                          title="关闭"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
+                    <ErrorAlert 
+                      error={error}
+                      onRetry={handleEditRequest}
+                      onDismiss={() => setError(null)}
+                    />
                   )}
 
                   {isLoading && (
@@ -1466,29 +1430,11 @@ const App: React.FC = () => {
             )}
 
             {error && (
-              <div className="error-alert-container fade-in">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-grow">
-                    <h4 className="font-semibold text-red-800 mb-1">生成失败</h4>
-                    <p className="text-sm text-red-600 mb-2">{error}</p>
-                    <p className="text-xs text-red-500">💡 提示：可以使用下方的"快速重试"按钮重新尝试</p>
-                  </div>
-                  <button
-                    onClick={() => setError(null)}
-                    className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors"
-                    title="关闭"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <ErrorAlert 
+                error={error}
+                onRetry={handleRetry}
+                onDismiss={() => setError(null)}
+              />
             )}
 
             {/* 对比模式切换按钮 */}
