@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const [selectedOriginalIndex, setSelectedOriginalIndex] = useState<number>(0); // 当前选中的原图索引
   const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false); // 批量选择模式
   const [selectedImages, setSelectedImages] = useState<boolean[]>([]); // 每张图片的选中状态
-  
+
   // 新增状态：比例和风格
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false); // 提示词优化状态
   const [aspectRatio, setAspectRatio] = useState<string>('1:1');
@@ -50,7 +50,7 @@ const App: React.FC = () => {
   // 提示词优化处理
   const handleEnhancePrompt = async () => {
     if (!prompt.trim()) return;
-    
+
     setIsEnhancing(true);
     try {
       const enhanced = await enhancePromptWithGemini(prompt);
@@ -93,21 +93,21 @@ const App: React.FC = () => {
       try {
         await dbManager.init();
         console.log('✅ IndexedDB 初始化成功');
-        
+
         // 尝试从 localStorage 迁移数据
         const migrationResult = await migrateFromLocalStorage();
         if (migrationResult.success && migrationResult.migratedCount > 0) {
           console.log(`🔄 已迁移 ${migrationResult.migratedCount} 条历史记录`);
         }
-        
+
         // 加载提示词历史
         const prompts = await dbManager.getPromptHistory(MAX_HISTORY_ITEMS);
         setPromptHistory(prompts);
-        
+
         // 加载生成历史
         const histories = await dbManager.getAllGenerationHistory(MAX_GENERATION_HISTORY);
         setGenerationHistory(histories);
-        
+
         // 显示存储使用情况
         const storageInfo = await dbManager.getStorageEstimate();
         console.log(`💾 存储使用: ${storageInfo.usageInMB} MB / ${storageInfo.quotaInMB} MB`);
@@ -115,9 +115,9 @@ const App: React.FC = () => {
         console.error('❌ IndexedDB 初始化失败:', error);
       }
     };
-    
+
     initDB();
-    
+
     // 组件卸载时关闭数据库连接
     return () => {
       dbManager.close();
@@ -128,18 +128,18 @@ const App: React.FC = () => {
   // 保存提示词到历史
   const savePromptToHistory = useCallback(async (promptText: string) => {
     if (!promptText.trim()) return;
-    
+
     setPromptHistory((prev) => {
       // 移除重复项（如果存在）
       const filtered = prev.filter(p => p !== promptText);
       // 添加到开头
       const newHistory = [promptText, ...filtered].slice(0, MAX_HISTORY_ITEMS);
-      
+
       // 保存到 IndexedDB
       dbManager.savePromptHistory(newHistory).catch(error => {
         console.error('Failed to save prompt history:', error);
       });
-      
+
       return newHistory;
     });
   }, []);
@@ -148,11 +148,11 @@ const App: React.FC = () => {
   const deletePromptHistoryItem = useCallback((promptToDelete: string) => {
     setPromptHistory((prev) => {
       const updated = prev.filter(p => p !== promptToDelete);
-      
+
       dbManager.savePromptHistory(updated).catch(error => {
         console.error('Failed to delete prompt history item:', error);
       });
-      
+
       return updated;
     });
   }, []);
@@ -166,8 +166,8 @@ const App: React.FC = () => {
   }, []);
 
   // 保存生成结果到历史（带图片压缩）
-  const saveToGenerationHistory = useCallback(async (original: string, 
-    edited: string, 
+  const saveToGenerationHistory = useCallback(async (original: string,
+    edited: string,
     promptText: string,
     isMulti: boolean = false,
     allOriginals?: string[],
@@ -177,7 +177,7 @@ const App: React.FC = () => {
       // 压缩图片以节省存储空间
       const compressedEdited = await compressImage(edited, 1280, 1280, 0.75);
       const compressedOriginal = await compressImage(original, 1280, 1280, 0.75);
-      
+
       // 如果是多图模式，也压缩所有原图
       let compressedOriginals: string[] | undefined;
       if (allOriginals && allOriginals.length > 0) {
@@ -185,7 +185,7 @@ const App: React.FC = () => {
           allOriginals.map(img => compressImage(img, 1280, 1280, 0.75))
         );
       }
-      
+
       const newHistory: GenerationHistory = {
         id: `gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         originalImage: compressedOriginal,
@@ -196,7 +196,7 @@ const App: React.FC = () => {
         originalImages: compressedOriginals,
         isTextToImage: isText,
       };
-      
+
       // 记录压缩效果
       const originalSize = getImageSize(edited);
       const compressedSize = getImageSize(compressedEdited);
@@ -205,13 +205,13 @@ const App: React.FC = () => {
       // 保存到 IndexedDB
       await dbManager.saveGenerationHistory(newHistory);
       console.log(`✅ 历史记录已保存: ${newHistory.id}`);
-      
+
       // 更新状态
       setGenerationHistory((prev) => {
         const updated = [newHistory, ...prev].slice(0, MAX_GENERATION_HISTORY);
         return updated;
       });
-      
+
       // 显示存储使用情况
       const storageInfo = await dbManager.getStorageEstimate();
       console.log(`💾 存储使用: ${storageInfo.usageInMB} MB / ${storageInfo.quotaInMB} MB`);
@@ -228,7 +228,7 @@ const App: React.FC = () => {
         originalImages: allOriginals,
         isTextToImage: isText,
       };
-      
+
       try {
         await dbManager.saveGenerationHistory(newHistory);
         setGenerationHistory((prev) => [newHistory, ...prev].slice(0, MAX_GENERATION_HISTORY));
@@ -288,7 +288,7 @@ const App: React.FC = () => {
         mimeType: item.originalImage.substring(item.originalImage.indexOf(':') + 1, item.originalImage.indexOf(';')),
       });
     }
-    
+
     setEditedImage(item.editedImage);
     setPrompt(item.prompt);
     setShowHistory(false);
@@ -299,16 +299,16 @@ const App: React.FC = () => {
     if (previewImage) {
       // 锁定背景滚动
       document.body.classList.add('modal-open');
-      
+
       // ESC 键关闭预览
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
           setPreviewImage(null);
         }
       };
-      
+
       window.addEventListener('keydown', handleKeyDown);
-      
+
       return () => {
         document.body.classList.remove('modal-open');
         window.removeEventListener('keydown', handleKeyDown);
@@ -341,17 +341,17 @@ const App: React.FC = () => {
       setError("请输入提示词。");
       return;
     }
-    
+
     if (mode === 'single' && !originalImage) {
       setError("请先上传图片。");
       return;
     }
-    
+
     if (mode === 'multi' && originalImages.length === 0) {
       setError("请至少上传一张图片。");
       return;
     }
-    
+
     // 保存当前状态用于撤销
     if (editedImage) {
       setPreviousState({
@@ -359,7 +359,7 @@ const App: React.FC = () => {
         prompt: prompt,
       });
     }
-    
+
     setIsLoading(true);
     setError(null);
     setEditedImage(null);
@@ -381,14 +381,14 @@ const App: React.FC = () => {
 
     try {
       let result: string;
-      
+
       // 应用风格到提示词 - 方案 A：强制前置
       let effectivePrompt = prompt;
       if (selectedStyle !== 'None') {
         // 将风格前置，确保 AI 优先处理
         effectivePrompt = `[Art Style: ${selectedStyle}] ${prompt}`;
       }
-      
+
       if (mode === 'text') {
         // 纯文字生成图片模式 - 传入比例参数
         // 注意：Gemini Service 中也会处理 aspectRatio，将其转换为提示词前缀
@@ -407,17 +407,17 @@ const App: React.FC = () => {
         result = await editMultipleImagesWithGemini(validImages, effectivePrompt);
         // 多图模式：保存所有原图
         saveToGenerationHistory(
-          validImages[0].dataUrl, 
-          result, 
+          validImages[0].dataUrl,
+          result,
           effectivePrompt,
           true, // isMultiImage
           validImages.map(img => img.dataUrl)
         );
       }
-      
+
       // 完成时设置进度为 100%
       setLoadingProgress(100);
-      
+
       setEditedImage(result);
       // 生成成功后保存提示词到历史 (保存原始输入，方便用户修改)
       savePromptToHistory(prompt);
@@ -458,16 +458,16 @@ const App: React.FC = () => {
   // 将当前生成结果作为新原图（Loopback）
   const handleUseEditedAsOriginal = () => {
     if (!editedImage) return;
-    
+
     const mimeType = editedImage.substring(editedImage.indexOf(':') + 1, editedImage.indexOf(';'));
     const base64 = editedImage.split(',')[1];
-    
+
     const newImage: ImageData = {
       dataUrl: editedImage,
       base64: base64,
       mimeType: mimeType
     };
-    
+
     if (mode === 'single') {
       setOriginalImage(newImage);
     } else {
@@ -481,7 +481,7 @@ const App: React.FC = () => {
         return newImages;
       });
     }
-    
+
     setEditedImage(null);
     // 保留提示词，方便用户微调
   };
@@ -500,10 +500,10 @@ const App: React.FC = () => {
   // 移除当前选中的原图
   const handleRemoveSelectedOriginal = () => {
     if (mode !== 'multi') return;
-    
+
     const newImages = originalImages.filter((_, i) => i !== selectedOriginalIndex);
     const newSelectedImages = selectedImages.filter((_, i) => i !== selectedOriginalIndex);
-    
+
     if (newImages.length === 0) {
       handleReset();
     } else if (newImages.length === 1) {
@@ -545,14 +545,14 @@ const App: React.FC = () => {
   // 确认选择，只保留选中的图片
   const confirmSelection = () => {
     const selectedIndices = selectedImages.map((selected, index) => selected ? index : -1).filter(i => i !== -1);
-    
+
     if (selectedIndices.length === 0) {
       alert('请至少选择一张图片！');
       return;
     }
-    
+
     const newImages = selectedIndices.map(i => originalImages[i]);
-    
+
     if (newImages.length === 1) {
       // 只选了一张，切换到单图模式
       setOriginalImage(newImages[0]);
@@ -566,7 +566,7 @@ const App: React.FC = () => {
       setSelectedImages(new Array(newImages.length).fill(true));
       setSelectedOriginalIndex(0);
     }
-    
+
     setIsSelectionMode(false);
     setEditedImage(null);
   };
@@ -577,7 +577,7 @@ const App: React.FC = () => {
       handleReset();
     }
   };
-  
+
   const singleImageSuggestions = [
     "Make it black and white",
     "Add a pirate hat",
@@ -616,7 +616,7 @@ const App: React.FC = () => {
         u8arr[n] = bstr.charCodeAt(n);
       }
       const blob = new Blob([u8arr], { type: mime });
-      
+
       // 创建 Blob URL 并下载
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -625,7 +625,7 @@ const App: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // 释放 Blob URL
       setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
     } catch (error) {
@@ -634,10 +634,10 @@ const App: React.FC = () => {
     }
   };
 
-  const ImageDisplay: React.FC<{ 
-    src: string | null; 
-    alt: string; 
-    title: string; 
+  const ImageDisplay: React.FC<{
+    src: string | null;
+    alt: string;
+    title: string;
     isLoading?: boolean;
     isPrimary?: boolean;
     showDownload?: boolean;
@@ -649,7 +649,7 @@ const App: React.FC = () => {
           {src && !isLoading && (
             <div className="flex items-center gap-2">
               {(isPrimary || showDownload) && (
-                <button 
+                <button
                   onClick={() => handleDownloadImage(src, isPrimary ? 'ai-generated-image.png' : 'original-image.png')}
                   className="bg-gradient-to-r from-purple-500 to-blue-500 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-white border border-purple-400 hover:from-purple-600 hover:to-blue-600 hover:shadow-lg transition-all opacity-0 group-hover:opacity-100"
                   title="下载图片"
@@ -657,7 +657,7 @@ const App: React.FC = () => {
                   💾 下载
                 </button>
               )}
-              <button 
+              <button
                 onClick={() => setPreviewImage(src)}
                 className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 border border-slate-200 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1.5"
               >
@@ -679,7 +679,7 @@ const App: React.FC = () => {
           <img src={src} alt={alt} className="w-full h-full object-contain rounded-lg" />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-3">
-            <MagicWandIcon className="w-24 h-24 opacity-20"/>
+            <MagicWandIcon className="w-24 h-24 opacity-20" />
             <p className="text-sm">等待生成...</p>
           </div>
         )}
@@ -688,25 +688,25 @@ const App: React.FC = () => {
   );
 
   const hasImages = mode === 'single' ? originalImage !== null : originalImages.length > 0;
-  
+  // 1232
   // 获取当前显示的原图URL（用于展示和对比）
-  const currentOriginalImageUrl = mode === 'single' && originalImage 
-    ? originalImage.dataUrl 
-    : mode === 'multi' && originalImages.length > 0 
-    ? originalImages[selectedOriginalIndex]?.dataUrl 
-    : null;
+  const currentOriginalImageUrl = mode === 'single' && originalImage
+    ? originalImage.dataUrl
+    : mode === 'multi' && originalImages.length > 0
+      ? originalImages[selectedOriginalIndex]?.dataUrl
+      : null;
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col items-center p-2 sm:p-4 relative pb-20 md:pb-4">
       {/* 加载进度组件 */}
       {isLoading && (
-        <LoadingProgress 
+        <LoadingProgress
           stage={loadingStage}
           progress={loadingProgress}
           estimatedTime={loadingProgress < 85 ? Math.ceil((100 - loadingProgress) / 5) : undefined}
         />
       )}
-      
+
       <Header />
       <main className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center flex-grow relative z-10">
         {/* 桌面端顶部模式切换栏 - 隐藏在移动端 */}
@@ -714,31 +714,28 @@ const App: React.FC = () => {
           <div className="glass-card p-1.5 flex justify-center items-center gap-1 shadow-lg bg-white/90 backdrop-blur-md">
             <button
               onClick={() => handleModeSwitch('single')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
-                mode === 'single'
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${mode === 'single'
                   ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md transform scale-105'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-              }`}
+                }`}
             >
               <span>🖼️</span> 单图编辑
             </button>
             <button
               onClick={() => handleModeSwitch('multi')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
-                mode === 'multi'
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${mode === 'multi'
                   ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md transform scale-105'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-              }`}
+                }`}
             >
               <span>🎨</span> 多图合成
             </button>
             <button
               onClick={() => handleModeSwitch('text')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
-                mode === 'text'
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 ${mode === 'text'
                   ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md transform scale-105'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-              }`}
+                }`}
             >
               <span>✨</span> 文字生图
             </button>
@@ -750,33 +747,30 @@ const App: React.FC = () => {
           <div className="flex items-center justify-around px-2 py-3">
             <button
               onClick={() => handleModeSwitch('single')}
-              className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 min-w-[70px] ${
-                mode === 'single'
+              className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 min-w-[70px] ${mode === 'single'
                   ? 'bg-gradient-to-br from-purple-500 to-blue-500 text-white shadow-lg scale-110'
                   : 'text-slate-500 active:bg-slate-100'
-              }`}
+                }`}
             >
               <span className="text-2xl">🖼️</span>
               <span className="text-[10px] font-bold">单图</span>
             </button>
             <button
               onClick={() => handleModeSwitch('multi')}
-              className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 min-w-[70px] ${
-                mode === 'multi'
+              className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 min-w-[70px] ${mode === 'multi'
                   ? 'bg-gradient-to-br from-purple-500 to-blue-500 text-white shadow-lg scale-110'
                   : 'text-slate-500 active:bg-slate-100'
-              }`}
+                }`}
             >
               <span className="text-2xl">🎨</span>
               <span className="text-[10px] font-bold">多图</span>
             </button>
             <button
               onClick={() => handleModeSwitch('text')}
-              className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 min-w-[70px] ${
-                mode === 'text'
+              className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 min-w-[70px] ${mode === 'text'
                   ? 'bg-gradient-to-br from-purple-500 to-blue-500 text-white shadow-lg scale-110'
                   : 'text-slate-500 active:bg-slate-100'
-              }`}
+                }`}
             >
               <span className="text-2xl">✨</span>
               <span className="text-[10px] font-bold">文字</span>
@@ -821,7 +815,7 @@ const App: React.FC = () => {
                       <span className="pro-label-icon">📝</span>
                       请详细描述您想要的图片
                     </label>
-                    
+
                     <div className="relative">
                       <textarea
                         value={prompt}
@@ -860,11 +854,10 @@ const App: React.FC = () => {
                             <button
                               key={r.value}
                               onClick={() => setAspectRatio(r.value)}
-                              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${
-                                aspectRatio === r.value
+                              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${aspectRatio === r.value
                                   ? 'bg-purple-500 text-white border-purple-500 shadow-sm'
                                   : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300'
-                              }`}
+                                }`}
                             >
                               {r.label}
                             </button>
@@ -925,12 +918,12 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex flex-wrap gap-0 max-h-32 overflow-y-auto p-1">
                         {promptHistory.map((historyPrompt, i) => (
-                          <div 
-                            key={i} 
+                          <div
+                            key={i}
                             className="history-chip-wrapper group relative"
                           >
-                            <button 
-                              onClick={() => setPrompt(historyPrompt)} 
+                            <button
+                              onClick={() => setPrompt(historyPrompt)}
                               className="history-chip"
                               title={historyPrompt}
                             >
@@ -967,9 +960,9 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {textToImageSuggestions.map((s, i) => (
-                        <button 
-                          key={i} 
-                          onClick={() => setPrompt(s)} 
+                        <button
+                          key={i}
+                          onClick={() => setPrompt(s)}
                           className="pro-chip"
                         >
                           {s}
@@ -988,7 +981,7 @@ const App: React.FC = () => {
                   </button>
 
                   {error && (
-                    <ErrorAlert 
+                    <ErrorAlert
                       error={error}
                       onRetry={handleEditRequest}
                       onDismiss={() => setError(null)}
@@ -1022,21 +1015,21 @@ const App: React.FC = () => {
                       </div>
 
                       <div className="relative group">
-                        <img 
-                          src={editedImage} 
-                          alt="生成的图片" 
+                        <img
+                          src={editedImage}
+                          alt="生成的图片"
                           className="w-full rounded-xl shadow-lg hover:shadow-2xl transition-shadow cursor-pointer"
                           onClick={() => setPreviewImage(editedImage)}
                         />
                         <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
+                          <button
                             onClick={() => setPreviewImage(editedImage)}
                             className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 border border-slate-200 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-all flex items-center gap-1.5"
                           >
                             <EyeIcon className="w-4 h-4" />
                             查看大图
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleDownloadImage(editedImage, 'ai-generated-image.png')}
                             className="bg-gradient-to-r from-purple-500 to-blue-500 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-white border border-purple-400 hover:from-purple-600 hover:to-blue-600 hover:shadow-lg transition-all"
                             title="下载图片"
@@ -1155,7 +1148,7 @@ const App: React.FC = () => {
                   提示：描述越详细，生成效果越精准
                 </div>
               </div>
-              
+
               <div className="pro-divider"></div>
 
               {/* 历史提示词 */}
@@ -1184,12 +1177,12 @@ const App: React.FC = () => {
                   </div>
                   <div className="flex flex-wrap gap-0 max-h-32 overflow-y-auto p-1">
                     {promptHistory.map((historyPrompt, i) => (
-                      <div 
-                        key={i} 
+                      <div
+                        key={i}
                         className="history-chip-wrapper group relative"
                       >
-                        <button 
-                          onClick={() => setPrompt(historyPrompt)} 
+                        <button
+                          onClick={() => setPrompt(historyPrompt)}
                           disabled={isLoading}
                           className="history-chip"
                           title={historyPrompt}
@@ -1216,7 +1209,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
               )}
-              
+
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
                   <svg className="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
@@ -1226,10 +1219,10 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {promptSuggestions.map((s, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => setPrompt(s)} 
-                      disabled={isLoading} 
+                    <button
+                      key={i}
+                      onClick={() => setPrompt(s)}
+                      disabled={isLoading}
                       className="pro-chip"
                     >
                       {s}
@@ -1256,7 +1249,7 @@ const App: React.FC = () => {
                     更换图片
                   </button>
                 </div>
-                
+
                 {/* 快速操作按钮 */}
                 {editedImage && (
                   <div className="flex flex-col sm:flex-row gap-2 fade-in">
@@ -1349,7 +1342,7 @@ const App: React.FC = () => {
                           onClick={() => loadFromHistory(item)}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                        
+
                         {/* 多图/文字生图标识 */}
                         {item.isTextToImage ? (
                           <div className="absolute top-2 left-2 px-2 py-1 bg-gradient-to-r from-pink-500 to-orange-500 backdrop-blur-sm text-white text-xs font-medium rounded-lg flex items-center gap-1">
@@ -1360,7 +1353,7 @@ const App: React.FC = () => {
                             🎨 {item.originalImages.length}图合成
                           </div>
                         ) : null}
-                        
+
                         {/* 悬浮操作按钮 */}
                         <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
@@ -1430,7 +1423,7 @@ const App: React.FC = () => {
             )}
 
             {error && (
-              <ErrorAlert 
+              <ErrorAlert
                 error={error}
                 onRetry={handleRetry}
                 onDismiss={() => setError(null)}
@@ -1444,16 +1437,15 @@ const App: React.FC = () => {
                 <div className="inline-flex rounded-xl border-2 border-slate-200 p-1 bg-white w-full sm:w-auto">
                   <button
                     onClick={() => setCompareMode('split')}
-                    className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-                      compareMode === 'split'
+                    className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${compareMode === 'split'
                         ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md'
                         : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                      }`}
                   >
                     <span className="flex items-center justify-center gap-1.5 sm:gap-2">
                       <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <rect x="3" y="6" width="7" height="12" rx="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <rect x="14" y="6" width="7" height="12" rx="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <rect x="3" y="6" width="7" height="12" rx="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <rect x="14" y="6" width="7" height="12" rx="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       <span className="hidden sm:inline">并排对比</span>
                       <span className="sm:hidden">并排</span>
@@ -1461,11 +1453,10 @@ const App: React.FC = () => {
                   </button>
                   <button
                     onClick={() => setCompareMode('slider')}
-                    className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-                      compareMode === 'slider'
+                    className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${compareMode === 'slider'
                         ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md'
                         : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                      }`}
                   >
                     <span className="flex items-center justify-center gap-1.5 sm:gap-2">
                       <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1484,13 +1475,13 @@ const App: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {currentOriginalImageUrl && (
                   <div className="flex flex-col gap-3">
-                    <ImageDisplay 
-                      src={currentOriginalImageUrl} 
-                      alt="Original image" 
+                    <ImageDisplay
+                      src={currentOriginalImageUrl}
+                      alt="Original image"
                       title={mode === 'single' ? "📸 原图" : `📸 原图 ${selectedOriginalIndex + 1}/${originalImages.length}`}
                       showDownload={true}
                     />
-                    
+
                     {/* 原图操作控制栏 */}
                     {mode === 'multi' && (
                       <div className="flex gap-2 mb-1">
@@ -1563,7 +1554,7 @@ const App: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        
+
                         {/* 缩略图网格 */}
                         <div className="flex gap-2 overflow-x-auto pb-2 px-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
                           {originalImages.map((img, idx) => (
@@ -1571,15 +1562,14 @@ const App: React.FC = () => {
                               <div key={idx} className="relative flex-shrink-0">
                                 <button
                                   onClick={() => isSelectionMode ? toggleImageSelection(idx) : setSelectedOriginalIndex(idx)}
-                                  className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                                    isSelectionMode
+                                  className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden border-2 transition-all ${isSelectionMode
                                       ? selectedImages[idx]
                                         ? 'border-green-500 ring-2 ring-green-200'
                                         : 'border-slate-200 opacity-50'
-                                      : selectedOriginalIndex === idx 
-                                        ? 'border-purple-500 ring-2 ring-purple-200 scale-105 shadow-md' 
+                                      : selectedOriginalIndex === idx
+                                        ? 'border-purple-500 ring-2 ring-purple-200 scale-105 shadow-md'
                                         : 'border-slate-200 hover:border-purple-300 opacity-70 hover:opacity-100'
-                                  }`}
+                                    }`}
                                   title={isSelectionMode ? `${selectedImages[idx] ? '取消选择' : '选择'}图片 ${idx + 1}` : `切换到图片 ${idx + 1}`}
                                 >
                                   <img src={img.dataUrl} alt={`thumbnail-${idx}`} className="w-full h-full object-cover" />
@@ -1604,14 +1594,14 @@ const App: React.FC = () => {
                     )}
                   </div>
                 )}
-                <ImageDisplay 
-                  src={editedImage} 
-                  alt="Edited image" 
-                  title={editedImage ? "✨ AI 生成结果" : "⏳ 等待生成"} 
+                <ImageDisplay
+                  src={editedImage}
+                  alt="Edited image"
+                  title={editedImage ? "✨ AI 生成结果" : "⏳ 等待生成"}
                   isLoading={isLoading}
                   isPrimary={!!editedImage}
                 />
-                
+
                 {/* 结果图操作控制栏 */}
                 {editedImage && !isLoading && (
                   <button
@@ -1633,7 +1623,7 @@ const App: React.FC = () => {
                     {/* 顶部操作按钮 */}
                     <div className="absolute top-4 right-4 z-20 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
                       {currentOriginalImageUrl && (
-                        <button 
+                        <button
                           onClick={() => setPreviewImage(currentOriginalImageUrl)}
                           className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 border border-slate-200 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-all flex items-center gap-1.5"
                           title="查看原图"
@@ -1642,7 +1632,7 @@ const App: React.FC = () => {
                           原图
                         </button>
                       )}
-                      <button 
+                      <button
                         onClick={() => setPreviewImage(editedImage)}
                         className="bg-gradient-to-r from-purple-500 to-blue-500 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-white border border-purple-400 hover:from-purple-600 hover:to-blue-600 hover:shadow-lg transition-all flex items-center gap-1.5"
                         title="查看AI生成图"
@@ -1650,7 +1640,7 @@ const App: React.FC = () => {
                         <EyeIcon className="w-3.5 h-3.5" />
                         AI图
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDownloadImage(editedImage, 'ai-generated-image.png')}
                         className="bg-gradient-to-r from-purple-500 to-blue-500 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-medium text-white border border-purple-400 hover:from-purple-600 hover:to-blue-600 hover:shadow-lg transition-all"
                         title="下载AI生成图"
@@ -1662,9 +1652,9 @@ const App: React.FC = () => {
                     {/* 原图层 */}
                     {currentOriginalImageUrl && (
                       <div className="absolute inset-0">
-                        <img 
-                          src={currentOriginalImageUrl} 
-                          alt="Original" 
+                        <img
+                          src={currentOriginalImageUrl}
+                          alt="Original"
                           className="w-full h-full object-contain"
                         />
                         <div className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/70 backdrop-blur-sm text-white text-sm font-medium rounded-lg">
@@ -1674,13 +1664,13 @@ const App: React.FC = () => {
                     )}
 
                     {/* 编辑图层（可裁剪） */}
-                    <div 
+                    <div
                       className="absolute inset-0 overflow-hidden"
                       style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
                     >
-                      <img 
-                        src={editedImage} 
-                        alt="Edited" 
+                      <img
+                        src={editedImage}
+                        alt="Edited"
                         className="w-full h-full object-contain"
                       />
                       <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-purple-600/90 backdrop-blur-sm text-white text-sm font-medium rounded-lg">
@@ -1689,7 +1679,7 @@ const App: React.FC = () => {
                     </div>
 
                     {/* 滑块控制器 */}
-                    <div 
+                    <div
                       className="absolute top-0 bottom-0 w-1 bg-white shadow-2xl cursor-ew-resize z-10"
                       style={{ left: `${sliderPosition}%` }}
                       onMouseDown={(e) => {
@@ -1774,7 +1764,7 @@ const App: React.FC = () => {
 
       {/* 图片预览模态框 */}
       {previewImage && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm animate-fade-in preview-modal-backdrop"
           onClick={() => setPreviewImage(null)}
         >
@@ -1806,17 +1796,17 @@ const App: React.FC = () => {
             </button>
 
             {/* 图片容器 */}
-            <div 
+            <div
               className="relative max-w-7xl max-h-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <img 
-                src={previewImage} 
-                alt="预览大图" 
+              <img
+                src={previewImage}
+                alt="预览大图"
                 className="max-w-full max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl preview-modal-image"
                 style={{ imageRendering: 'high-quality' }}
               />
-              
+
               {/* 图片信息提示 */}
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 backdrop-blur-md text-white text-sm rounded-full border border-white/20">
                 <span className="flex items-center gap-2">
