@@ -3,16 +3,21 @@
 import React from 'react';
 
 interface ErrorAlertProps {
-  error: string;
+  message?: string; // 兼容 App.tsx 传入的 message
+  error?: string; // 兼容旧接口
+  onClose?: () => void; // 兼容 App.tsx 传入的 onClose
   onRetry?: () => void;
   onDismiss?: () => void;
 }
 
-const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) => {
+const ErrorAlert: React.FC<ErrorAlertProps> = ({ message, error, onClose, onRetry, onDismiss }) => {
+  const errorText = message || error || "未知错误"; // 兼容两种传参方式
+  const handleDismiss = onClose || onDismiss; // 兼容两种关闭回调
+
   // 错误类型识别和友好提示
   const getErrorInfo = (errorMessage: string) => {
-    const lowerError = errorMessage.toLowerCase();
-    
+    const lowerError = (errorMessage || "").toLowerCase();
+
     // 网络错误
     if (lowerError.includes('network') || lowerError.includes('fetch failed') || lowerError.includes('failed to fetch')) {
       return {
@@ -24,7 +29,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
         color: 'orange',
       };
     }
-    
+
     // API 错误
     if (lowerError.includes('api') || lowerError.includes('500') || lowerError.includes('503')) {
       return {
@@ -36,7 +41,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
         color: 'red',
       };
     }
-    
+
     // 认证错误
     if (lowerError.includes('api_key') || lowerError.includes('api key') || lowerError.includes('unauthorized') || lowerError.includes('401')) {
       return {
@@ -48,7 +53,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
         color: 'yellow',
       };
     }
-    
+
     // 配额错误
     if (lowerError.includes('quota') || lowerError.includes('limit') || lowerError.includes('429')) {
       return {
@@ -60,7 +65,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
         color: 'purple',
       };
     }
-    
+
     // 图片错误
     if (lowerError.includes('image') || lowerError.includes('file')) {
       return {
@@ -72,7 +77,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
         color: 'blue',
       };
     }
-    
+
     // 超时错误
     if (lowerError.includes('timeout') || lowerError.includes('timed out')) {
       return {
@@ -84,7 +89,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
         color: 'orange',
       };
     }
-    
+
     // 提示词错误
     if (lowerError.includes('prompt') || lowerError.includes('invalid')) {
       return {
@@ -96,7 +101,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
         color: 'yellow',
       };
     }
-    
+
     // 默认错误
     return {
       icon: '❌',
@@ -108,8 +113,8 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
     };
   };
 
-  const errorInfo = getErrorInfo(error);
-  
+  const errorInfo = getErrorInfo(errorText);
+
   // 颜色配置
   const colorClasses = {
     red: {
@@ -163,19 +168,19 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
         <div className={`${colors.icon} w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0 shadow-lg animate-bounce-once`}>
           {errorInfo.icon}
         </div>
-        
+
         {/* 内容 */}
         <div className="flex-1 min-w-0">
           {/* 标题 */}
           <h3 className={`text-xl font-bold ${colors.title} mb-2`}>
             {errorInfo.title}
           </h3>
-          
+
           {/* 错误信息 */}
           <p className={`${colors.message} text-base mb-3 leading-relaxed`}>
             {errorInfo.message}
           </p>
-          
+
           {/* 建议 */}
           <div className="bg-white/60 rounded-lg p-3 mb-4 border border-gray-200">
             <p className="text-sm text-gray-700 flex items-start gap-2">
@@ -183,7 +188,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
               <span>{errorInfo.suggestion}</span>
             </p>
           </div>
-          
+
           {/* 操作按钮 */}
           <div className="flex gap-3 flex-wrap">
             {onRetry && (
@@ -195,22 +200,22 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
                 <span>重试</span>
               </button>
             )}
-            
-            {onDismiss && (
+
+            {handleDismiss && (
               <button
-                onClick={onDismiss}
+                onClick={handleDismiss}
                 className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-5 py-2.5 rounded-lg font-medium transition-all duration-200 hover:shadow-lg transform hover:scale-105"
               >
                 关闭
               </button>
             )}
-            
+
             {/* 查看详情按钮（可选） */}
             <button
               onClick={() => {
                 console.group('🔍 错误详情');
                 console.error('错误类型:', errorInfo.type);
-                console.error('原始错误:', error);
+                console.error('原始错误:', errorText);
                 console.error('时间:', new Date().toLocaleString());
                 console.groupEnd();
                 alert('错误详情已输出到控制台（F12）');
@@ -221,11 +226,11 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({ error, onRetry, onDismiss }) =>
             </button>
           </div>
         </div>
-        
+
         {/* 关闭按钮 */}
-        {onDismiss && (
+        {handleDismiss && (
           <button
-            onClick={onDismiss}
+            onClick={handleDismiss}
             className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
             aria-label="关闭"
           >

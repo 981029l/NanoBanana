@@ -2,7 +2,45 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Nano Banana Photo Editor
+# 📕 小红书 AI 写手
+
+一键生成爆款小红书笔记，复制即可发布。
+
+## 功能特点
+
+- 🎯 **8种笔记类型** - 种草推荐、真实测评、教程攻略、日常分享、美食探店、旅行攻略、穿搭时尚、自由创作
+- 🤖 **AI 智能生成** - 基于 Gemini AI，生成标题、正文、话题标签
+- 🖼️ **图片辅助** - 上传配图，AI 分析图片内容辅助生成文案
+- ✏️ **内容优化** - 不满意可以让 AI 重新优化
+- 📋 **一键复制** - 标题、正文、标签分开复制或一键全部复制
+
+## 使用方法
+
+1. 选择笔记类型
+2. 输入笔记主题（描述越详细越好）
+3. 可选上传配图
+4. 点击"生成小红书笔记"
+5. 复制内容到小红书发布
+
+## 技术栈
+
+- React 19 + TypeScript
+- Vite
+- Tailwind CSS
+- Google Gemini AI
+
+## 开发
+
+```bash
+npm install
+npm run dev
+```
+
+需要配置环境变量 `API_KEY` 为 Google Gemini API Key。
+
+---
+
+# Nano Banana Photo Editor (原版)
 
 基于 Google Gemini 3 Pro Image 的 AI 图片编辑器
 
